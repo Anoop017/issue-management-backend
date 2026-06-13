@@ -8,6 +8,13 @@
       "when": 1781313261273,
       "tag": "0000_swift_sebastian_shaw",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781325016993,
+      "tag": "0001_equal_nightshade",
+      "breakpoints": true
     }
   ]
 }
