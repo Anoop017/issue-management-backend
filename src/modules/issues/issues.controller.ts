@@ -19,11 +19,11 @@ import {
 import {
   issuePriorities,
   issueStatuses,
-  type IssuePriority,
-  type IssueStatus,
 } from '../../database/schema/issues.schema';
 import { CreateIssueDto } from './dto/create-issue.dto';
 import { IssueDto } from './dto/issue.dto';
+import { ListIssuesQueryDto } from './dto/list-issues-query.dto';
+import { PaginatedIssuesDto } from './dto/paginated-issues.dto';
 import { UpdateIssueDto } from './dto/update-issue.dto';
 import { IssuesService } from './issues.service';
 
@@ -72,28 +72,50 @@ export class IssuesController {
     enum: issuePriorities,
     description: 'Filter issues by priority',
   })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search issues by title or description',
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    enum: ['createdAt', 'updatedAt', 'title', 'priority'],
+    description: 'Sort issues by a supported field',
+  })
+  @ApiQuery({
+    name: 'order',
+    required: false,
+    enum: ['asc', 'desc'],
+    description: 'Sort direction',
+  })
   @ApiResponse({
     status: 200,
     description: 'Issues retrieved successfully.',
-    type: IssueDto,
-    isArray: true,
-    example: [
-      {
-        id: 1,
-        title: 'Login page throws 500 error',
-        description: 'Users see a 500 error after submitting valid credentials.',
-        status: 'open',
-        priority: 'high',
-        createdAt: '2026-06-13T09:30:00.000Z',
-        updatedAt: '2026-06-13T09:30:00.000Z',
+    type: PaginatedIssuesDto,
+    example: {
+      data: [
+        {
+          id: 1,
+          title: 'Login page throws 500 error',
+          description: 'Users see a 500 error after submitting valid credentials.',
+          status: 'open',
+          priority: 'high',
+          createdAt: '2026-06-13T09:30:00.000Z',
+          updatedAt: '2026-06-13T09:30:00.000Z',
+        },
+      ],
+      meta: {
+        page: 1,
+        limit: 10,
+        total: 1,
+        totalPages: 1,
       },
-    ],
+    },
   })
-  findAll(
-    @Query('status') status?: IssueStatus,
-    @Query('priority') priority?: IssuePriority,
-  ) {
-    return this.issuesService.findAll({ status, priority });
+  findAll(@Query() query: ListIssuesQueryDto) {
+    return this.issuesService.findAll(query);
   }
 
   @Get(':id')

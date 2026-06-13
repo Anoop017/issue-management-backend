@@ -7,15 +7,19 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import {
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { CommentDto } from './dto/comment.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
+import { ListCommentsQueryDto } from './dto/list-comments-query.dto';
+import { PaginatedCommentsDto } from './dto/paginated-comments.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { CommentsService } from './comments.service';
 
@@ -57,25 +61,47 @@ export class CommentsController {
     description: 'Returns all comments attached to the provided issue ID.',
   })
   @ApiParam({ name: 'issueId', type: Number, example: 1 })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    enum: ['createdAt', 'updatedAt'],
+    description: 'Sort comments by a supported field',
+  })
+  @ApiQuery({
+    name: 'order',
+    required: false,
+    enum: ['asc', 'desc'],
+    description: 'Sort direction',
+  })
   @ApiResponse({
     status: 200,
     description: 'Comments retrieved successfully.',
-    type: CommentDto,
-    isArray: true,
-    example: [
-      {
-        id: 1,
-        issueId: 1,
-        content: 'I reproduced this on the staging environment as well.',
-        authorName: 'Anoop',
-        createdAt: '2026-06-13T10:15:00.000Z',
-        updatedAt: '2026-06-13T10:15:00.000Z',
+    type: PaginatedCommentsDto,
+    example: {
+      data: [
+        {
+          id: 1,
+          issueId: 1,
+          content: 'I reproduced this on the staging environment as well.',
+          authorName: 'Anoop',
+          createdAt: '2026-06-13T10:15:00.000Z',
+          updatedAt: '2026-06-13T10:15:00.000Z',
+        },
+      ],
+      meta: {
+        page: 1,
+        limit: 10,
+        total: 1,
+        totalPages: 1,
       },
-    ],
+    },
   })
   @ApiResponse({ status: 404, description: 'Issue not found.' })
-  findAll(@Param('issueId', ParseIntPipe) issueId: number) {
-    return this.commentsService.findAll(issueId);
+  findAll(
+    @Param('issueId', ParseIntPipe) issueId: number,
+    @Query() query: ListCommentsQueryDto,
+  ) {
+    return this.commentsService.findAll(issueId, query);
   }
 
   @Patch(':commentId')

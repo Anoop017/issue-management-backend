@@ -1,9 +1,10 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, count, desc, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DATABASE_CONNECTION } from '../../database/database.constants';
 import { comments } from '../../database/schema/comments.schema';
 import { CreateCommentDto } from './dto/create-comment.dto';
+import { ListCommentsQueryDto } from './dto/list-comments-query.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { IssuesService } from '../issues/issues.service';
 
@@ -30,14 +31,47 @@ export class CommentsService {
     return comment;
   }
 
-  async findAll(issueId: number) {
+  async findAll(issueId: number, query: ListCommentsQueryDto) {
     await this.issuesService.findOne(issueId);
 
-    return this.database
+    const {
+      page = 1,
+      limit = 10,
+      sortBy = 'createdAt',
+      order = 'desc',
+    } = query;
+    const offset = (page - 1) * limit;
+    const sortColumn = {
+      createdAt: comments.createdAt,
+      updatedAt: comments.updatedAt,
+    }[sortBy];
+    const orderByClause = order === 'asc' ? asc(sortColumn) : desc(sortColumn);
+
+    const dataQuery = this.database
       .select()
       .from(comments)
       .where(eq(comments.issueId, issueId))
-      .orderBy(asc(comments.id));
+      .orderBy(orderByClause, asc(comments.id))
+      .limit(limit)
+      .offset(offset);
+
+    const totalQuery = this.database
+      .select({ total: count() })
+      .from(comments)
+      .where(eq(comments.issueId, issueId));
+
+    const [data, totalResult] = await Promise.all([dataQuery, totalQuery]);
+    const total = totalResult[0]?.total ?? 0;
+
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+      },
+    };
   }
 
   async update(

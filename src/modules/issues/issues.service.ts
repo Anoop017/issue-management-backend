@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, or } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DATABASE_CONNECTION } from '../../database/database.constants';
 import {
@@ -8,6 +8,7 @@ import {
   type IssueStatus,
 } from '../../database/schema/issues.schema';
 import { CreateIssueDto } from './dto/create-issue.dto';
+import { ListIssuesQueryDto } from './dto/list-issues-query.dto';
 import { UpdateIssueDto } from './dto/update-issue.dto';
 
 @Injectable()
@@ -30,21 +31,67 @@ export class IssuesService {
     return issue;
   }
 
-  async findAll(filters?: { status?: IssueStatus; priority?: IssuePriority }) {
+  async findAll(query: ListIssuesQueryDto) {
+    const {
+      status,
+      priority,
+      search,
+      page = 1,
+      limit = 10,
+      sortBy = 'createdAt',
+      order = 'desc',
+    } = query;
     const conditions = [
-      filters?.status ? eq(issues.status, filters.status) : undefined,
-      filters?.priority ? eq(issues.priority, filters.priority) : undefined,
+      status ? eq(issues.status, status) : undefined,
+      priority ? eq(issues.priority, priority) : undefined,
+      search
+        ? or(
+            ilike(issues.title, `%${search}%`),
+            ilike(issues.description, `%${search}%`),
+          )
+        : undefined,
     ].filter((condition) => condition !== undefined);
 
-    if (conditions.length === 0) {
-      return this.database.select().from(issues).orderBy(asc(issues.id));
-    }
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    const offset = (page - 1) * limit;
+    const sortColumn = {
+      createdAt: issues.createdAt,
+      updatedAt: issues.updatedAt,
+      title: issues.title,
+      priority: issues.priority,
+    }[sortBy];
+    const orderByClause = order === 'asc' ? asc(sortColumn) : desc(sortColumn);
 
-    return this.database
+    const baseIssuesQuery = this.database
       .select()
       .from(issues)
-      .where(and(...conditions))
-      .orderBy(asc(issues.id));
+      .orderBy(orderByClause, asc(issues.id))
+      .limit(limit)
+      .offset(offset);
+
+    const baseTotalQuery = this.database
+      .select({ total: count() })
+      .from(issues);
+
+    const issuesQuery = whereClause
+      ? baseIssuesQuery.where(whereClause)
+      : baseIssuesQuery;
+    const totalQuery = whereClause
+      ? baseTotalQuery.where(whereClause)
+      : baseTotalQuery;
+
+    const [data, totalResult] = await Promise.all([issuesQuery, totalQuery]);
+    const total = totalResult[0]?.total ?? 0;
+
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(id: number) {
