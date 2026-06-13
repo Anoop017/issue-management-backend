@@ -291,7 +291,6 @@ npm run lint               # Run ESLint
 # Database
 npm run db:generate        # Generate migration from schema changes
 npm run db:migrate         # Apply migrations to database
-npm run db:verify          # Verify database setup and health
 
 # Development
 npm run start              # Start application
