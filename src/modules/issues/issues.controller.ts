@@ -33,6 +33,7 @@ import { IssuesService } from './issues.service';
 export class IssuesController {
   constructor(private readonly issuesService: IssuesService) { }
 
+  // ============ CREATE ============
   @Post()
   @ApiOperation({
     summary: 'Create a new issue',
@@ -56,6 +57,7 @@ export class IssuesController {
     return this.issuesService.create(createIssueDto);
   }
 
+  // ============ LIST & FILTERS ============
   @Get()
   @ApiOperation({
     summary: 'List all issues',
@@ -119,6 +121,141 @@ export class IssuesController {
     return this.issuesService.findAll(query);
   }
 
+  // ============ RECYCLE BIN (Specific route before :id) ============
+  @Get('deleted/bin')
+  @ApiOperation({
+    summary: 'List deleted issues (recycle bin)',
+    description: 'Returns all soft-deleted issues for recovery or permanent deletion.',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    example: 10,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Deleted issues retrieved successfully.',
+    schema: {
+      example: {
+        data: [
+          {
+            id: 1,
+            title: 'Login page throws 500 error',
+            description: 'Users see a 500 error after submitting valid credentials.',
+            status: 'open',
+            priority: 'high',
+            createdAt: '2026-06-13T09:30:00.000Z',
+            updatedAt: '2026-06-13T10:15:00.000Z',
+            deletedAt: '2026-06-13T10:15:00.000Z',
+          },
+        ],
+        meta: {
+          page: 1,
+          limit: 10,
+          total: 1,
+          totalPages: 1,
+        },
+      },
+    },
+  })
+  findDeleted(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ) {
+    return this.issuesService.findDeleted(page, limit);
+  }
+
+  // ============ BULK OPERATIONS (Specific routes before :id) ============
+  @Post('bulk/soft-delete')
+  @ApiOperation({
+    summary: 'Soft delete multiple issues',
+    description: 'Moves multiple issues to the recycle bin in a single operation.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Issues moved to recycle bin.',
+    schema: {
+      example: {
+        message: '3 issue(s) moved to recycle bin',
+        deletedCount: 3,
+        issues: [
+          {
+            id: 1,
+            title: 'Login page throws 500 error',
+            description: 'Users see a 500 error after submitting valid credentials.',
+            status: 'open',
+            priority: 'high',
+            createdAt: '2026-06-13T09:30:00.000Z',
+            updatedAt: '2026-06-13T10:15:00.000Z',
+            deletedAt: '2026-06-13T10:15:00.000Z',
+          },
+        ],
+      },
+    },
+  })
+  bulkSoftDelete(@Body() bulkDeleteDto: BulkDeleteDto) {
+    return this.issuesService.bulkSoftDelete(bulkDeleteDto.ids);
+  }
+
+  @Delete('bulk/permanent')
+  @ApiOperation({
+    summary: 'Permanently delete multiple issues',
+    description: 'Permanently deletes multiple issues from the database. This action cannot be undone.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Issues permanently deleted.',
+    schema: {
+      example: {
+        message: '3 issue(s) permanently deleted',
+        deletedCount: 3,
+        deletedIds: [1, 2, 3],
+      },
+    },
+  })
+  bulkPermanentDelete(@Body() bulkDeleteDto: BulkDeleteDto) {
+    return this.issuesService.bulkPermanentDelete(bulkDeleteDto.ids);
+  }
+
+  @Patch('bulk/restore')
+  @ApiOperation({
+    summary: 'Restore multiple deleted issues',
+    description: 'Restores multiple soft-deleted issues from the recycle bin in a single operation.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Issues restored successfully.',
+    schema: {
+      example: {
+        message: '3 issue(s) restored successfully',
+        restoredCount: 3,
+        issues: [
+          {
+            id: 1,
+            title: 'Login page throws 500 error',
+            description: 'Users see a 500 error after submitting valid credentials.',
+            status: 'open',
+            priority: 'high',
+            createdAt: '2026-06-13T09:30:00.000Z',
+            updatedAt: '2026-06-13T10:20:00.000Z',
+            deletedAt: null,
+          },
+        ],
+      },
+    },
+  })
+  bulkRestore(@Body() bulkDeleteDto: BulkDeleteDto) {
+    return this.issuesService.bulkRestore(bulkDeleteDto.ids);
+  }
+
+  // ============ ID-BASED OPERATIONS (MUST come after specific routes) ============
   @Get(':id')
   @ApiOperation({
     summary: 'Get an issue by ID',
@@ -250,137 +387,5 @@ export class IssuesController {
   @ApiResponse({ status: 404, description: 'Deleted issue not found.' })
   restore(@Param('id', ParseIntPipe) id: number) {
     return this.issuesService.restore(id);
-  }
-
-  @Get('deleted/bin')
-  @ApiOperation({
-    summary: 'List deleted issues (recycle bin)',
-    description: 'Returns all soft-deleted issues for recovery or permanent deletion.',
-  })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    example: 1,
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    example: 10,
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Deleted issues retrieved successfully.',
-    schema: {
-      example: {
-        data: [
-          {
-            id: 1,
-            title: 'Login page throws 500 error',
-            description: 'Users see a 500 error after submitting valid credentials.',
-            status: 'open',
-            priority: 'high',
-            createdAt: '2026-06-13T09:30:00.000Z',
-            updatedAt: '2026-06-13T10:15:00.000Z',
-            deletedAt: '2026-06-13T10:15:00.000Z',
-          },
-        ],
-        meta: {
-          page: 1,
-          limit: 10,
-          total: 1,
-          totalPages: 1,
-        },
-      },
-    },
-  })
-  findDeleted(
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 10,
-  ) {
-    return this.issuesService.findDeleted(page, limit);
-  }
-
-  @Post('bulk/soft-delete')
-  @ApiOperation({
-    summary: 'Soft delete multiple issues',
-    description: 'Moves multiple issues to the recycle bin in a single operation.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Issues moved to recycle bin.',
-    schema: {
-      example: {
-        message: '3 issue(s) moved to recycle bin',
-        deletedCount: 3,
-        issues: [
-          {
-            id: 1,
-            title: 'Login page throws 500 error',
-            description: 'Users see a 500 error after submitting valid credentials.',
-            status: 'open',
-            priority: 'high',
-            createdAt: '2026-06-13T09:30:00.000Z',
-            updatedAt: '2026-06-13T10:15:00.000Z',
-            deletedAt: '2026-06-13T10:15:00.000Z',
-          },
-        ],
-      },
-    },
-  })
-  bulkSoftDelete(@Body() bulkDeleteDto: BulkDeleteDto) {
-    return this.issuesService.bulkSoftDelete(bulkDeleteDto.ids);
-  }
-
-  @Delete('bulk/permanent')
-  @ApiOperation({
-    summary: 'Permanently delete multiple issues',
-    description: 'Permanently deletes multiple issues from the database. This action cannot be undone.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Issues permanently deleted.',
-    schema: {
-      example: {
-        message: '3 issue(s) permanently deleted',
-        deletedCount: 3,
-        deletedIds: [1, 2, 3],
-      },
-    },
-  })
-  bulkPermanentDelete(@Body() bulkDeleteDto: BulkDeleteDto) {
-    return this.issuesService.bulkPermanentDelete(bulkDeleteDto.ids);
-  }
-
-  @Patch('bulk/restore')
-  @ApiOperation({
-    summary: 'Restore multiple deleted issues',
-    description: 'Restores multiple soft-deleted issues from the recycle bin in a single operation.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Issues restored successfully.',
-    schema: {
-      example: {
-        message: '3 issue(s) restored successfully',
-        restoredCount: 3,
-        issues: [
-          {
-            id: 1,
-            title: 'Login page throws 500 error',
-            description: 'Users see a 500 error after submitting valid credentials.',
-            status: 'open',
-            priority: 'high',
-            createdAt: '2026-06-13T09:30:00.000Z',
-            updatedAt: '2026-06-13T10:20:00.000Z',
-            deletedAt: null,
-          },
-        ],
-      },
-    },
-  })
-  bulkRestore(@Body() bulkDeleteDto: BulkDeleteDto) {
-    return this.issuesService.bulkRestore(bulkDeleteDto.ids);
   }
 }
