@@ -36,4 +36,6 @@ export const issues = pgTable('issues', {
   updatedAt: timestamp('updated_at')
     .defaultNow()
     .notNull(),
+
+  deletedAt: timestamp('deleted_at'),
 });

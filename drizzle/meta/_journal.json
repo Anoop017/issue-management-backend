@@ -15,6 +15,13 @@
       "when": 1781325016993,
       "tag": "0001_equal_nightshade",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781350338066,
+      "tag": "0002_chemical_garia",
+      "breakpoints": true
     }
   ]
 }

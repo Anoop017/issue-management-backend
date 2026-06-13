@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, count, desc, eq, ilike, or } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, or } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DATABASE_CONNECTION } from '../../database/database.constants';
 import {
@@ -16,7 +16,7 @@ export class IssuesService {
   constructor(
     @Inject(DATABASE_CONNECTION)
     private readonly database: NodePgDatabase,
-  ) {}
+  ) { }
 
   async create(createIssueDto: CreateIssueDto) {
     const [issue] = await this.database
@@ -46,10 +46,11 @@ export class IssuesService {
       priority ? eq(issues.priority, priority) : undefined,
       search
         ? or(
-            ilike(issues.title, `%${search}%`),
-            ilike(issues.description, `%${search}%`),
-          )
+          ilike(issues.title, `%${search}%`),
+          ilike(issues.description, `%${search}%`),
+        )
         : undefined,
+      isNull(issues.deletedAt), // Exclude soft-deleted issues
     ].filter((condition) => condition !== undefined);
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -94,11 +95,15 @@ export class IssuesService {
     };
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, includeDeleted = false) {
     const [issue] = await this.database
       .select()
       .from(issues)
-      .where(eq(issues.id, id));
+      .where(
+        includeDeleted
+          ? eq(issues.id, id)
+          : and(eq(issues.id, id), isNull(issues.deletedAt)),
+      );
 
     if (!issue) {
       throw new NotFoundException(`Issue with ID ${id} not found`);
@@ -126,16 +131,163 @@ export class IssuesService {
     return updatedIssue;
   }
 
-  async remove(id: number) {
-    const [deletedIssue] = await this.database
+  async softDelete(id: number) {
+    await this.findOne(id);
+
+    const [softDeletedIssue] = await this.database
+      .update(issues)
+      .set({
+        deletedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(issues.id, id))
+      .returning();
+
+    return {
+      message: 'Issue moved to recycle bin',
+      issue: softDeletedIssue,
+    };
+  }
+
+  async permanentDelete(id: number) {
+    await this.findOne(id, true); // Check if issue exists (including deleted)
+
+    const [permanentlyDeletedIssue] = await this.database
       .delete(issues)
       .where(eq(issues.id, id))
       .returning({ id: issues.id });
 
-    if (!deletedIssue) {
+    if (!permanentlyDeletedIssue) {
       throw new NotFoundException(`Issue with ID ${id} not found`);
     }
 
-    return { message: 'Issue deleted successfully' };
+    return { message: 'Issue permanently deleted' };
+  }
+
+  async restore(id: number) {
+    const [issue] = await this.database
+      .select()
+      .from(issues)
+      .where(and(eq(issues.id, id), isNotNull(issues.deletedAt)));
+
+    if (!issue) {
+      throw new NotFoundException(
+        `Deleted issue with ID ${id} not found in recycle bin`,
+      );
+    }
+
+    const [restoredIssue] = await this.database
+      .update(issues)
+      .set({
+        deletedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(issues.id, id))
+      .returning();
+
+    return {
+      message: 'Issue restored successfully',
+      issue: restoredIssue,
+    };
+  }
+
+  async findDeleted(page = 1, limit = 10) {
+    const offset = (page - 1) * limit;
+
+    const [data, totalResult] = await Promise.all([
+      this.database
+        .select()
+        .from(issues)
+        .where(isNotNull(issues.deletedAt))
+        .orderBy(desc(issues.deletedAt), asc(issues.id))
+        .limit(limit)
+        .offset(offset),
+      this.database
+        .select({ total: count() })
+        .from(issues)
+        .where(isNotNull(issues.deletedAt)),
+    ]);
+
+    const total = totalResult[0]?.total ?? 0;
+
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async bulkSoftDelete(ids: number[]) {
+    if (ids.length === 0) {
+      return {
+        message: 'No issues to delete',
+        deletedCount: 0,
+        issues: [],
+      };
+    }
+
+    const deletedIssues = await this.database
+      .update(issues)
+      .set({
+        deletedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(inArray(issues.id, ids))
+      .returning();
+
+    return {
+      message: `${deletedIssues.length} issue(s) moved to recycle bin`,
+      deletedCount: deletedIssues.length,
+      issues: deletedIssues,
+    };
+  }
+
+  async bulkPermanentDelete(ids: number[]) {
+    if (ids.length === 0) {
+      return {
+        message: 'No issues to delete',
+        deletedCount: 0,
+      };
+    }
+
+    const result = await this.database
+      .delete(issues)
+      .where(inArray(issues.id, ids))
+      .returning({ id: issues.id });
+
+    return {
+      message: `${result.length} issue(s) permanently deleted`,
+      deletedCount: result.length,
+      deletedIds: result.map((r) => r.id),
+    };
+  }
+
+  async bulkRestore(ids: number[]) {
+    if (ids.length === 0) {
+      return {
+        message: 'No issues to restore',
+        restoredCount: 0,
+        issues: [],
+      };
+    }
+
+    const restoredIssues = await this.database
+      .update(issues)
+      .set({
+        deletedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(and(inArray(issues.id, ids), isNotNull(issues.deletedAt)))
+      .returning();
+
+    return {
+      message: `${restoredIssues.length} issue(s) restored successfully`,
+      restoredCount: restoredIssues.length,
+      issues: restoredIssues,
+    };
   }
 }
