@@ -43,14 +43,14 @@ issue-management-backend/
 
 - Node.js v18+ (tested on v24.15.0)
 - PostgreSQL 12+
-- npm or yarn
+- npm
 - Google Gemini API key (for AI analysis feature)
 
 ## 📦 Installation
 
 ### 1. Clone the repository
 ```bash
-git clone <repository-url>
+git clone https://github.com/Anoop017/issue-management-backend.git
 cd issue-management-backend
 ```
 
@@ -67,11 +67,8 @@ Create a `.env` file in the root directory:
 # Database Configuration
 DATABASE_URL=postgresql://username:password@localhost:5432/issue_management
 
-# Server Configuration
+# PORT Number
 PORT=3000
-
-# Node Environment
-NODE_ENV=development
 
 # Gemini AI Configuration (required for AI analysis feature)
 GEMINI_API_KEY=your_gemini_api_key_here
@@ -94,8 +91,6 @@ npm run db:generate
 # Apply migrations to your database
 npm run db:migrate
 
-# Verify database setup (tables, columns, migrations)
-npm run db:verify
 ```
 
 ## 🚀 Running the Application
@@ -244,28 +239,7 @@ curl -X POST http://localhost:3000/issues/bulk/soft-delete \
 - Swagger UI with live endpoint testing
 - Full endpoint descriptions and examples
 - Request/response schemas automatically documented
-
-## 🧪 Testing
-
-### Run unit tests
-```bash
-npm run test
-```
-
-### Run unit tests in watch mode
-```bash
-npm run test:watch
-```
-
-### Generate coverage report
-```bash
-npm run test:cov
-```
-
-### Run e2e tests
-```bash
-npm run test:e2e
-```
+``
 
 ## 📝 Project Structure
 
@@ -325,11 +299,6 @@ npm run start:dev          # Start with hot reload
 npm run start:debug        # Start with debugger
 npm run start:prod         # Start production build
 
-# Testing
-npm run test               # Run unit tests
-npm run test:watch        # Run tests in watch mode
-npm run test:cov          # Generate coverage report
-npm run test:e2e          # Run e2e tests
 ```
 
 ## 🔐 Environment Variables Reference
@@ -338,7 +307,6 @@ npm run test:e2e          # Run e2e tests
 |----------|----------|-------------|
 | DATABASE_URL | Yes | PostgreSQL connection string |
 | PORT | No | Server port (default: 3000) |
-| NODE_ENV | No | Environment (development/production) |
 | GEMINI_API_KEY | Yes | Google Gemini API key for AI analysis |
 
 ## 🐛 Troubleshooting
@@ -350,15 +318,6 @@ Error: connect ECONNREFUSED 127.0.0.1:5432
 - Ensure PostgreSQL is running
 - Check DATABASE_URL in .env
 - Verify database exists and user has permissions
-
-### Migrations not applying
-```bash
-# Verify current migration state
-npm run db:verify
-
-# If tables exist but migrations not tracked:
-npm run db:sync
-```
 
 ### AI analysis returns empty
 - Verify GEMINI_API_KEY is set and valid
@@ -380,7 +339,3 @@ npm run db:sync
 - ✅ Swagger API documentation
 - ✅ Request validation
 - ✅ Database migrations
-
-## 📄 License
-
-MIT
